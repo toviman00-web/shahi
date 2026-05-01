@@ -1,8 +1,48 @@
-// Маршрут для обробки посилання з параметром room
+const TelegramBot = require('node-telegram-bot-api');
+const express = require('express');
+const http = require('http');
+
+const app = express(); // Спочатку створюємо app!
+const server = http.createServer(app);
+
+app.use(express.json());
+
+const TOKEN = process.env.TELEGRAM_TOKEN;
+const WEBAPP_URL = process.env.WEBAPP_URL || "https://shahi-production.up.railway.app";
+
+const bot = new TelegramBot(TOKEN);
+
+// Налаштовуємо Webhook
+const url = "https://shahi-production.up.railway.app";
+bot.setWebHook(`${url}/bot${TOKEN}`);
+
+app.post(`/bot${TOKEN}`, (req, res) => {
+    try {
+        if (!req.body) {
+            return res.sendStatus(400);
+        }
+        bot.processUpdate(req.body);
+        res.sendStatus(200);
+    } catch (e) {
+        console.log("Помилка обробки запиту:", e.message);
+        res.sendStatus(200);
+    }
+});
+
+// Обробка команди /start
+bot.onText(/\/start/, (msg) => {
+    const chatId = msg.chat.id;
+    bot.sendMessage(chatId, "Привіт! Натисни кнопку нижче, щоб відкрити гру.", {
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: "🎮 Грати в шахи", web_app: { url: WEBAPP_URL } }]
+            ]
+        }
+    });
+});
+
+// Тепер app визначено, тому ця частина працюватиме без помилок
 app.get('/', (req, res) => {
-    // Отримуємо параметр room з посилання (наприклад, ?room=abc12345)
-    const roomId = req.query.room;
-    
     res.send(`
     <!DOCTYPE html>
     <html lang="uk">
@@ -130,11 +170,9 @@ app.get('/', (req, res) => {
             var board = null;
             var game = null;
 
-            // Перевіряємо, чи є в посиланні параметр ?room=...
             const urlParams = new URLSearchParams(window.location.search);
             const roomParam = urlParams.get('room');
 
-            // Якщо друг зайшов за посиланням з кімнатою
             if (roomParam) {
                 alert("Ви приєдналися до гри в кімнаті: " + roomParam);
                 startNewGame();
@@ -149,10 +187,7 @@ app.get('/', (req, res) => {
             function startFriendGame() {
                 showScreen('screen-friend-game');
                 
-                // Генеруємо унікальний ID для кімнати
                 const roomId = Math.random().toString(36).substring(2, 10);
-                
-                // Беремо посилання з Web App або генеруємо за замовчуванням
                 const baseUrl = window.location.origin || "https://shahi-production.up.railway.app";
                 const gameLink = baseUrl + '?room=' + roomId;
                 
@@ -225,4 +260,9 @@ app.get('/', (req, res) => {
     </body>
     </html>
     `);
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Сервер працює на порту ${PORT}`);
 });
