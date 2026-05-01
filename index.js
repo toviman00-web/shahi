@@ -2,7 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const express = require('express');
 const http = require('http');
 
-const app = express(); // Спочатку створюємо app!
+const app = express();
 const server = http.createServer(app);
 
 app.use(express.json());
@@ -12,7 +12,6 @@ const WEBAPP_URL = process.env.WEBAPP_URL || "https://shahi-production.up.railwa
 
 const bot = new TelegramBot(TOKEN);
 
-// Налаштовуємо Webhook
 const url = "https://shahi-production.up.railway.app";
 bot.setWebHook(`${url}/bot${TOKEN}`);
 
@@ -29,7 +28,6 @@ app.post(`/bot${TOKEN}`, (req, res) => {
     }
 });
 
-// Обробка команди /start
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
     bot.sendMessage(chatId, "Привіт! Натисни кнопку нижче, щоб відкрити гру.", {
@@ -41,7 +39,6 @@ bot.onText(/\/start/, (msg) => {
     });
 });
 
-// Тепер app визначено, тому ця частина працюватиме без помилок
 app.get('/', (req, res) => {
     res.send(`
     <!DOCTYPE html>
@@ -104,12 +101,12 @@ app.get('/', (req, res) => {
             #link-box {
                 background: #f8fafc;
                 padding: 12px;
-                border: 1px dashed #94a3b8;
+                border: 1px solid #cbd5e1;
                 border-radius: 8px;
                 margin: 15px 0;
-                font-family: monospace;
-                word-break: break-all;
-                font-size: 0.95rem;
+                font-size: 1.05rem;
+                font-weight: bold;
+                color: #1e293b;
             }
             #myBoard {
                 margin: 0 auto;
@@ -122,6 +119,8 @@ app.get('/', (req, res) => {
                 color: #475569;
                 font-size: 1.1rem;
             }
+            .difficulty-btn { background-color: #10b981; }
+            .difficulty-btn:hover { background-color: #059669; }
         </style>
     </head>
     <body>
@@ -140,19 +139,28 @@ app.get('/', (req, res) => {
         <div id="screen-chess-menu" class="screen">
             <h1>Шахмати</h1>
             <button onclick="startFriendGame()">👥 Гра з другом</button>
+            <button class="difficulty-btn" onclick="showScreen('screen-bot-difficulty')">🤖 Грати проти бота</button>
             <button class="secondary-btn" onclick="showScreen('screen-games')">⬅️ Назад</button>
         </div>
 
         <div id="screen-friend-game" class="screen">
             <h1>Гра з другом</h1>
-            <p>Надішліть це посилання другу. Як тільки він перейде за ним, почнеться гра:</p>
-            <div id="link-box" style="user-select: all;">Завантаження...</div>
+            <p>Надішліть це посилання другу. Як тільки він перейде, почнеться гра:</p>
+            <div id="link-box">Завантаження...</div>
             <button onclick="copyLink()">📋 Скопіювати посилання</button>
             <button class="secondary-btn" onclick="showScreen('screen-chess-menu')">⬅️ Назад</button>
         </div>
 
+        <div id="screen-bot-difficulty" class="screen">
+            <h1>Виберіть рівень</h1>
+            <button onclick="startGameWithBot('easy')">🟢 Легкий</button>
+            <button class="secondary-btn" style="background-color: #f59e0b; color: white;" onclick="startGameWithBot('medium')">🟡 Середній</button>
+            <button class="difficulty-btn" style="background-color: #ef4444;" onclick="startGameWithBot('hard')">🔴 Складний</button>
+            <button class="secondary-btn" onclick="showScreen('screen-chess-menu')">⬅️ Назад</button>
+        </div>
+
         <div id="screen-gameplay" class="screen">
-            <h1>Хід Білих</h1>
+            <h1 id="gameplay-title">Хід Білих</h1>
             <div id="myBoard"></div>
             <p id="status"></p>
             <button class="secondary-btn" style="margin-top: 20px;" onclick="showScreen('screen-main')">🏠 У головне меню</button>
@@ -162,7 +170,7 @@ app.get('/', (req, res) => {
         <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
         <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
-
+        
         <script>
             const tg = window.Telegram.WebApp;
             tg.expand();
@@ -174,8 +182,8 @@ app.get('/', (req, res) => {
             const roomParam = urlParams.get('room');
 
             if (roomParam) {
-                alert("Ви приєдналися до гри в кімнаті: " + roomParam);
-                startNewGame();
+                alert("Ви успішно приєдналися до гри! Починаємо.");
+                startGameWithBot('medium');
             }
 
             function showScreen(screenId) {
@@ -186,10 +194,8 @@ app.get('/', (req, res) => {
 
             function startFriendGame() {
                 showScreen('screen-friend-game');
-                
-                const roomId = Math.random().toString(36).substring(2, 10);
-                const baseUrl = window.location.origin || "https://shahi-production.up.railway.app";
-                const gameLink = baseUrl + '?room=' + roomId;
+                const roomId = Math.random().toString(36).substring(2, 8);
+                const gameLink = "https://shahi-production.up.railway.app/room/" + roomId;
                 
                 document.getElementById('link-box').innerText = gameLink;
             }
@@ -197,25 +203,31 @@ app.get('/', (req, res) => {
             function copyLink() {
                 const linkText = document.getElementById('link-box').innerText;
                 navigator.clipboard.writeText(linkText).then(() => {
-                    alert('Посилання скопійовано у буфер обміну!');
+                    alert('Посилання скопійовано!');
                 });
             }
 
-            function startNewGame() {
+            function startGameWithBot(difficulty) {
                 showScreen('screen-gameplay');
+                document.getElementById('gameplay-title').innerText = 'Гра проти бота (' + difficulty + ')';
+                
+                // Даємо екрану час промалюватися перед викликом chessboard
                 setTimeout(() => {
                     game = new Chess();
+                    
+                    // Вказуємо правильний шлях до піктограм фігур
                     var config = {
                         draggable: true,
                         position: 'start',
+                        pieceTheme: 'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/{piece}.png',
                         onDragStart: onDragStart,
                         onDrop: onDrop,
-                        onSnapEnd: onSnapEnd,
-                        pieceTheme: 'https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/img/chesspieces/wikipedia/{piece}.png'
+                        onSnapEnd: onSnapEnd
                     };
+                    
                     board = Chessboard('myBoard', config);
                     updateStatus();
-                }, 100);
+                }, 200);
             }
 
             function onDragStart (source, piece, position, orientation) {
@@ -228,7 +240,6 @@ app.get('/', (req, res) => {
                     to: target,
                     promotion: 'q'
                 });
-                
                 if (move === null) return 'snapback';
                 updateStatus();
             }
