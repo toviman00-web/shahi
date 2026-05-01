@@ -99,14 +99,14 @@
         <button class="secondary-btn" onclick="showScreen('screen-games')">⬅️ Назад</button>
     </div>
 
-  <div id="screen-friend-game" class="screen">
-    <h1>Гра з другом</h1>
-    <p>Скопіюйте посилання та надішліть другу:</p>
-    <div id="link-box">Завантаження...</div>
-    <button onclick="copyLink()">📋 Скопіювати посилання</button>
-    <button style="background-color: #10b981;" onclick="joinMyRoom()">🎮 Увійти у свою гру</button>
-    <button class="secondary-btn" onclick="showScreen('screen-chess-menu')">⬅️ Назад</button>
-</div>
+    <div id="screen-friend-game" class="screen">
+        <h1>Гра з другом</h1>
+        <p>Скопіюйте посилання та надішліть другу:</p>
+        <div id="link-box">Завантаження...</div>
+        <button onclick="copyLink()">📋 Скопіювати посилання</button>
+        <button style="background-color: #10b981;" onclick="joinMyRoom()">🎮 Увійти у свою гру</button>
+        <button class="secondary-btn" onclick="showScreen('screen-chess-menu')">⬅️ Назад</button>
+    </div>
 
     <div id="screen-bot-difficulty" class="screen">
         <h1>Виберіть рівень складності</h1>
@@ -138,6 +138,9 @@
         var selectedSquare = null;
         var socket = io();
         var currentRoomId = null;
+        
+        // Зберігаємо колір гравця (білі або чорні)
+        var playerColor = null; 
 
         const urlParams = new URLSearchParams(window.location.search);
         const roomParam = urlParams.get('room');
@@ -145,6 +148,9 @@
         if (roomParam) {
             currentRoomId = roomParam;
             socket.emit('join_room', currentRoomId);
+            
+            // Якщо є параметр - це гравець, який приєднався, тобто грає за чорних
+            playerColor = 'b';
             startGame('friend', 'medium');
         }
 
@@ -157,14 +163,21 @@
         function startFriendGame() {
             showScreen('screen-friend-game');
             
-            const botUsername = "shahmatii_bot"; // Вкажіть ваш юзернейм
+            const botUsername = "shahmatii_bot";
             const roomId = Math.random().toString(36).substring(2, 8);
             currentRoomId = roomId;
             
             socket.emit('join_room', currentRoomId);
             
+            // Власник створює гру і грає за білих
+            playerColor = 'w';
+            
             const gameLink = "https://t.me/" + botUsername + "?start=room_" + roomId;
             document.getElementById('link-box').innerText = gameLink;
+        }
+
+        function joinMyRoom() {
+            startGame('friend', 'medium');
         }
 
         function copyLink() {
@@ -173,10 +186,7 @@
                 alert('Посилання скопійовано!');
             });
         }
-function joinMyRoom() {
-            // Переводимо власника на екран гри
-            startGame('friend', 'medium');
-        }
+
         function startGame(mode, difficulty) {
             showScreen('screen-gameplay');
             
@@ -184,7 +194,7 @@ function joinMyRoom() {
             if (mode === 'bot') {
                 modeText = 'Гра проти бота (' + difficulty + ')';
             } else {
-                modeText = 'Гра з другом (кімната: ' + (currentRoomId || roomParam) + ')';
+                modeText = 'Гра з другом (Колір: ' + (playerColor === 'w' ? 'Білі' : 'Чорні') + ')';
             }
             
             document.getElementById('gameplay-title').innerText = modeText;
@@ -200,13 +210,11 @@ function joinMyRoom() {
                 board = Chessboard('myBoard', config);
                 updateStatus();
 
-                // Обробник натискання на клітинку
                 $('#myBoard').on('click', '.square-55d63', function() {
                     var square = $(this).attr('data-square');
                     handleClick(square);
                 });
 
-                // Слухаємо хід від іншого гравця через Socket.io
                 socket.on('move_made', (moveData) => {
                     game.move({
                         from: moveData.from,
@@ -220,11 +228,20 @@ function joinMyRoom() {
         }
 
         function handleClick(square) {
+            // Перевіряємо чи зараз черга ходити вашого кольору
+            if (playerColor && game.turn() !== playerColor) {
+                alert("Зараз не ваша черга ходити!");
+                return;
+            }
+
             if (!selectedSquare) {
                 var piece = game.get(square);
-                if (piece) {
+                // Перевіряємо, чи гравець намагається взяти свою фігуру
+                if (piece && piece.color === playerColor) {
                     selectedSquare = square;
                     $('[data-square="' + square + '"]').css('background', '#64ffda');
+                } else if (piece && piece.color !== playerColor) {
+                    alert("Ви можете ходити лише своїми фігурами!");
                 }
             } else {
                 var source = selectedSquare;
@@ -242,7 +259,6 @@ function joinMyRoom() {
 
                 if (move === null) return;
 
-                // Відправляємо хід іншому гравцеві через сервер
                 socket.emit('make_move', {
                     roomId: currentRoomId || roomParam,
                     move: { from: source, to: target }
