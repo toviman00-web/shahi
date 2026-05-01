@@ -5,20 +5,33 @@ const http = require('http');
 const app = express();
 const server = http.createServer(app);
 
+// Додаємо обробку JSON, щоб бот розумів запити від Telegram
+app.use(express.json());
+
 const TOKEN = process.env.TELEGRAM_TOKEN;
 const WEBAPP_URL = process.env.WEBAPP_URL || "https://shahi-production.up.railway.app";
 
-// Створюємо бота БЕЗ { polling: true }
 const bot = new TelegramBot(TOKEN);
 
 // Налаштовуємо Webhook
 const url = "https://shahi-production.up.railway.app";
 bot.setWebHook(`${url}/bot${TOKEN}`);
 
-// Обробка вхідних повідомлень через Webhook
+// Обробка вхідних повідомлень через Webhook з перевіркою на помилки
 app.post(`/bot${TOKEN}`, (req, res) => {
-    bot.processUpdate(req.body);
-    res.sendStatus(200);
+    try {
+        // Захист від падіння, якщо тіло запиту порожнє
+        if (!req.body) {
+            return res.sendStatus(400);
+        }
+        
+        bot.processUpdate(req.body);
+        res.sendStatus(200);
+    } catch (e) {
+        // Ігноруємо помилки, щоб сервер не падав
+        console.log("Помилка обробки запиту:", e.message);
+        res.sendStatus(200);
+    }
 });
 
 // Обробка команди /start
