@@ -28,25 +28,28 @@ app.post(`/bot${TOKEN}`, (req, res) => {
     }
 });
 
-// Обробка команд
+// Обробка запуску бота з параметрами
 bot.onText(/\/start (.+)/, (msg, match) => {
     const chatId = msg.chat.id;
-    const payload = match[1]; // Отримуємо параметр, наприклад, "room_xxxxxx"
+    const payload = match[1]; // Отримуємо параметри, наприклад, "room_xxxxxx"
     
     if (payload && payload.startsWith('room_')) {
         const roomId = payload.split('_')[1];
         
-        // Повідомлення для друга, який перейшов за посиланням
-        bot.sendMessage(chatId, `Ви успішно перейшли за посиланням для гри в кімнаті: ${roomId}. Натисніть кнопку нижче, щоб почати гру!`, {
+        // Передаємо параметр кімнати далі через URL
+        const fullWebappUrl = `${WEBAPP_URL}?room=${roomId}`;
+        
+        bot.sendMessage(chatId, "Ви успішно перейшли за посиланням! Натисніть кнопку нижче, щоб приєднатися до гри.", {
             reply_markup: {
                 inline_keyboard: [
-                    [{ text: "🎮 Приєднатися до гри", web_app: { url: WEBAPP_URL } }]
+                    [{ text: "🎮 Приєднатися до гри", web_app: { url: fullWebappUrl } }]
                 ]
             }
         });
     }
 });
 
+// Обробка звичайної команди /start
 bot.onText(/\/start$/, (msg) => {
     const chatId = msg.chat.id;
     bot.sendMessage(chatId, "Привіт! Натисни кнопку нижче, щоб відкрити гру в шахи.", {
@@ -126,6 +129,7 @@ app.get('/', (req, res) => {
                 font-size: 1.05rem;
                 font-weight: bold;
                 color: #1e293b;
+                word-break: break-all;
             }
             #myBoard {
                 margin: 0 auto;
@@ -171,7 +175,7 @@ app.get('/', (req, res) => {
         </div>
 
         <div id="screen-bot-difficulty" class="screen">
-            <h1>Виберіть рівень</h1>
+            <h1>Виберіть рівень складності</h1>
             <button onclick="startGameWithBot('easy')">🟢 Легкий</button>
             <button class="secondary-btn" style="background-color: #f59e0b; color: white;" onclick="startGameWithBot('medium')">🟡 Середній</button>
             <button class="difficulty-btn" style="background-color: #ef4444;" onclick="startGameWithBot('hard')">🔴 Складний</button>
@@ -197,12 +201,13 @@ app.get('/', (req, res) => {
             var board = null;
             var game = null;
 
-            // Перевіряємо URL
+            // Перевіряємо URL на наявність room
             const urlParams = new URLSearchParams(window.location.search);
             const roomParam = urlParams.get('room');
 
             if (roomParam) {
-                startGameWithBot('medium');
+                // Якщо параметр присутній, одразу починаємо гру
+                startGameWithBot('medium'); 
             }
 
             function showScreen(screenId) {
@@ -230,7 +235,12 @@ app.get('/', (req, res) => {
 
             function startGameWithBot(difficulty) {
                 showScreen('screen-gameplay');
-                document.getElementById('gameplay-title').innerText = 'Гра проти бота (' + difficulty + ')';
+                
+                let modeText = 'Гра проти бота (' + difficulty + ')';
+                if (roomParam) {
+                    modeText = 'Гра з другом (кімната: ' + roomParam + ')';
+                }
+                document.getElementById('gameplay-title').innerText = modeText;
                 
                 setTimeout(() => {
                     game = new Chess();
