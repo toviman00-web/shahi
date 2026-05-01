@@ -1,17 +1,23 @@
-const TelegramBot = require('node-telegram-bot-api');
 const express = require('express');
 const http = require('http');
+const { Server } = require('socket.io');
+const path = require('path');
+const TelegramBot = require('node-telegram-bot-api');
 
 const app = express();
 const server = http.createServer(app);
+const io = new Server(server);
 
 app.use(express.json());
 
+// Роздаємо статичні файли з папки public
+app.use(express.static(path.join(__dirname, 'public')));
+
 const TOKEN = process.env.TELEGRAM_TOKEN;
 const WEBAPP_URL = process.env.WEBAPP_URL || "https://shahi-production.up.railway.app";
-
 const bot = new TelegramBot(TOKEN);
 
+// Налаштування Webhook для Telegram
 const url = "https://shahi-production.up.railway.app";
 bot.setWebHook(`${url}/bot${TOKEN}`);
 
@@ -28,11 +34,10 @@ app.post(`/bot${TOKEN}`, (req, res) => {
     }
 });
 
-// Обробка запуску бота
+// Обробка команд бота
 bot.onText(/\/start (.+)/, (msg, match) => {
     const chatId = msg.chat.id;
     const payload = match[1];
-    
     if (payload && payload.startsWith('room_')) {
         const roomId = payload.split('_')[1];
         const fullWebappUrl = `${WEBAPP_URL}?room=${roomId}`;
@@ -49,7 +54,7 @@ bot.onText(/\/start (.+)/, (msg, match) => {
 
 bot.onText(/\/start$/, (msg) => {
     const chatId = msg.chat.id;
-    bot.sendMessage(chatId, "Привіт! Натисни кнопку нижче, щоб відкрити гру.", {
+    bot.sendMessage(chatId, "Привіт! Натисніть кнопку нижче, щоб відкрити шахову гру.", {
         reply_markup: {
             inline_keyboard: [
                 [{ text: "🎮 Грати в шахи", web_app: { url: WEBAPP_URL } }]
@@ -58,270 +63,23 @@ bot.onText(/\/start$/, (msg) => {
     });
 });
 
-app.get('/', (req, res) => {
-    res.send(`
-    <!DOCTYPE html>
-    <html lang="uk">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Telegram Шахи</title>
-        <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
-        <style>
-            * { box-sizing: border-box; }
-            body {
-                font-family: sans-serif;
-                background-color: #f0f0f0;
-                margin: 0;
-                padding: 20px;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                min-height: 100vh;
-            }
-            .screen {
-                background: white;
-                padding: 25px;
-                border-radius: 16px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                text-align: center;
-                width: 100%;
-                max-width: 420px;
-                display: none;
-            }
-            .active-screen {
-                display: block;
-            }
-            h1 {
-                font-size: 1.6rem;
-                margin-top: 0;
-                color: #222;
-                margin-bottom: 25px;
-            }
-            button {
-                background-color: #388af6;
-                color: white;
-                border: none;
-                padding: 14px 20px;
-                font-size: 1.1rem;
-                border-radius: 10px;
-                cursor: pointer;
-                width: 100%;
-                margin-bottom: 12px;
-                font-weight: bold;
-                transition: background-color 0.2s;
-            }
-            button:hover { background-color: #1a6ddb; }
-            .secondary-btn {
-                background-color: #e2e8f0;
-                color: #334155;
-            }
-            .secondary-btn:hover { background-color: #cbd5e1; }
-            #link-box {
-                background: #f8fafc;
-                padding: 12px;
-                border: 1px solid #cbd5e1;
-                border-radius: 8px;
-                margin: 15px 0;
-                font-size: 1.05rem;
-                font-weight: bold;
-                color: #1e293b;
-                word-break: break-all;
-            }
-            #myBoard {
-                margin: 0 auto;
-                width: 100%;
-                max-width: 380px;
-            }
-            #status {
-                margin-top: 15px;
-                font-weight: bold;
-                color: #475569;
-                font-size: 1.1rem;
-            }
-            .difficulty-btn { background-color: #10b981; }
-            .difficulty-btn:hover { background-color: #059669; }
-        </style>
-    </head>
-    <body>
+// Логіка Socket.io для гри з другом в реальному часі
+io.on('connection', (socket) => {
+    console.log('Користувач підключений:', socket.id);
 
-        <div id="screen-main" class="screen active-screen">
-            <h1>Головне меню</h1>
-            <button onclick="showScreen('screen-games')">🎮 Ігри</button>
-        </div>
+    socket.on('join_room', (roomId) => {
+        socket.join(roomId);
+        console.log(`Користувач ${socket.id} приєднався до кімнати: ${roomId}`);
+    });
 
-        <div id="screen-games" class="screen">
-            <h1>Вибір гри</h1>
-            <button onclick="showScreen('screen-chess-menu')">♟️ Шахмати</button>
-            <button class="secondary-btn" onclick="showScreen('screen-main')">⬅️ Назад</button>
-        </div>
+    socket.on('make_move', (data) => {
+        // Передаємо хід іншому гравцю в цій же кімнаті
+        socket.to(data.roomId).emit('move_made', data.move);
+    });
 
-        <div id="screen-chess-menu" class="screen">
-            <h1>Шахмати</h1>
-            <button onclick="startFriendGame()">👥 Гра з другом</button>
-            <button class="difficulty-btn" onclick="showScreen('screen-bot-difficulty')">🤖 Грати проти бота</button>
-            <button class="secondary-btn" onclick="showScreen('screen-games')">⬅️ Назад</button>
-        </div>
-
-        <div id="screen-friend-game" class="screen">
-            <h1>Гра з другом</h1>
-            <p>Скопіюйте посилання та надішліть другу:</p>
-            <div id="link-box">Завантаження...</div>
-            <button onclick="copyLink()">📋 Скопіювати посилання</button>
-            <button class="secondary-btn" onclick="showScreen('screen-chess-menu')">⬅️ Назад</button>
-        </div>
-
-        <div id="screen-bot-difficulty" class="screen">
-            <h1>Виберіть рівень складності</h1>
-            <button onclick="startGame('bot', 'easy')">🟢 Легкий</button>
-            <button class="secondary-btn" style="background-color: #f59e0b; color: white;" onclick="startGame('bot', 'medium')">🟡 Середній</button>
-            <button class="difficulty-btn" style="background-color: #ef4444;" onclick="startGame('bot', 'hard')">🔴 Складний</button>
-            <button class="secondary-btn" onclick="showScreen('screen-chess-menu')">⬅️ Назад</button>
-        </div>
-
-        <div id="screen-gameplay" class="screen">
-            <h1 id="gameplay-title">Хід Білих</h1>
-            <div id="myBoard"></div>
-            <p id="status"></p>
-            <button class="secondary-btn" style="margin-top: 20px;" onclick="showScreen('screen-main')">🏠 У головне меню</button>
-        </div>
-
-        <script src="https://telegram.org/js/telegram-web-app.js"></script>
-        <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-        <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
-        
-        <script>
-            const tg = window.Telegram.WebApp;
-            tg.expand();
-
-            var board = null;
-            var game = null;
-            var selectedSquare = null; // Зберігаємо клітинку, з якої робимо хід
-
-            const urlParams = new URLSearchParams(window.location.search);
-            const roomParam = urlParams.get('room');
-
-            if (roomParam) {
-                startGame('friend', 'medium');
-            }
-
-            function showScreen(screenId) {
-                const screens = document.querySelectorAll('.screen');
-                screens.forEach(s => s.classList.remove('active-screen'));
-                document.getElementById(screenId).classList.add('active-screen');
-            }
-
-            function startFriendGame() {
-                showScreen('screen-friend-game');
-                
-                const botUsername = "shahmatii_bot"; // Переконайтеся, що юзернейм збігається з вашим
-                const roomId = Math.random().toString(36).substring(2, 8);
-                const gameLink = "https://t.me/" + botUsername + "?start=room_" + roomId;
-                
-                document.getElementById('link-box').innerText = gameLink;
-            }
-
-            function copyLink() {
-                const linkText = document.getElementById('link-box').innerText;
-                navigator.clipboard.writeText(linkText).then(() => {
-                    alert('Посилання скопійовано!');
-                });
-            }
-
-            function startGame(mode, difficulty) {
-                showScreen('screen-gameplay');
-                
-                let modeText = '';
-                if (mode === 'bot') {
-                    modeText = 'Гра проти бота (' + difficulty + ')';
-                } else {
-                    modeText = 'Гра з другом';
-                    if (roomParam) {
-                        modeText += ' (кімната: ' + roomParam + ')';
-                    }
-                }
-                
-                document.getElementById('gameplay-title').innerText = modeText;
-                
-                setTimeout(() => {
-                    game = new Chess();
-                    
-                    var config = {
-                        draggable: false, // Вимикаємо стандартне перетягування (draggable), щоб додати кліки
-                        position: 'start',
-                        pieceTheme: 'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/{piece}.png',
-                    };
-                    
-                    board = Chessboard('myBoard', config);
-                    updateStatus();
-
-                    // Додаємо обробник натискання на дошку
-                    $('#myBoard').on('click', '.square-55d63', function() {
-                        var square = $(this).attr('data-square');
-                        handleClick(square);
-                    });
-                }, 300);
-            }
-
-            function handleClick(square) {
-                // Якщо фігуру ще не вибрано
-                if (!selectedSquare) {
-                    var piece = game.get(square);
-                    if (piece) {
-                        selectedSquare = square;
-                        // Візуально виділяємо вибрану клітинку
-                        $('[data-square="' + square + '"]').css('background', '#64ffda');
-                    }
-                } else {
-                    // Якщо клітинка вже виділена, робимо хід
-                    var source = selectedSquare;
-                    var target = square;
-
-                    // Знімаємо підсвічування з попередньої клітинки
-                    $('[data-square="' + source + '"]').css('background', '');
-
-                    var move = game.move({
-                        from: source,
-                        to: target,
-                        promotion: 'q' // Автоперетворення на ферзя для простоти
-                    });
-
-                    selectedSquare = null; // Скидаємо вибір
-
-                    if (move === null) {
-                        // Якщо хід неможливий, скасовуємо виділення та не робимо дій
-                        return;
-                    }
-
-                    board.position(game.fen());
-                    updateStatus();
-                }
-            }
-
-            function updateStatus() {
-                var status = '';
-                var moveColor = 'Білих';
-                if (game.turn() === 'b') {
-                    moveColor = 'Чорних';
-                }
-
-                if (game.in_checkmate()) {
-                    status = 'Гра закінчена. Мат для ' + moveColor + '.';
-                } else if (game.in_draw()) {
-                    status = 'Гра закінчена. Нічия.';
-                } else {
-                    status = 'Хід ' + moveColor;
-                    if (game.in_check()) {
-                        status += ' (Шах!)';
-                    }
-                }
-                document.getElementById('status').innerText = status;
-            }
-        </script>
-    </body>
-    </html>
-    `);
+    socket.on('disconnect', () => {
+        console.log('Користувач відключився:', socket.id);
+    });
 });
 
 const PORT = process.env.PORT || 3000;
