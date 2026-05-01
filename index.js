@@ -224,7 +224,7 @@ app.get('/', (req, res) => {
             function startFriendGame() {
                 showScreen('screen-friend-game');
                 
-                const botUsername = "shahmatii_bot"; // Вкажіть ваш юзернейм
+                const botUsername = "shahmatii_bot";
                 const roomId = Math.random().toString(36).substring(2, 8);
                 const gameLink = "https://t.me/" + botUsername + "?start=room_" + roomId;
                 
