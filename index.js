@@ -31,15 +31,13 @@ app.post(`/bot${TOKEN}`, (req, res) => {
 // Обробка запуску бота з параметрами
 bot.onText(/\/start (.+)/, (msg, match) => {
     const chatId = msg.chat.id;
-    const payload = match[1]; // Отримуємо параметри, наприклад, "room_xxxxxx"
+    const payload = match[1];
     
     if (payload && payload.startsWith('room_')) {
         const roomId = payload.split('_')[1];
-        
-        // Передаємо параметр кімнати далі через URL
         const fullWebappUrl = `${WEBAPP_URL}?room=${roomId}`;
         
-        bot.sendMessage(chatId, "Ви успішно перейшли за посиланням! Натисніть кнопку нижче, щоб приєднатися до гри.", {
+        bot.sendMessage(chatId, "Ви перейшли за запрошенням! Натисніть кнопку нижче, щоб приєднатися до гри.", {
             reply_markup: {
                 inline_keyboard: [
                     [{ text: "🎮 Приєднатися до гри", web_app: { url: fullWebappUrl } }]
@@ -52,7 +50,7 @@ bot.onText(/\/start (.+)/, (msg, match) => {
 // Обробка звичайної команди /start
 bot.onText(/\/start$/, (msg) => {
     const chatId = msg.chat.id;
-    bot.sendMessage(chatId, "Привіт! Натисни кнопку нижче, щоб відкрити гру в шахи.", {
+    bot.sendMessage(chatId, "Привіт! Натисни кнопку нижче, щоб відкрити Web App гру в шахи.", {
         reply_markup: {
             inline_keyboard: [
                 [{ text: "🎮 Грати в шахи", web_app: { url: WEBAPP_URL } }]
@@ -151,11 +149,18 @@ app.get('/', (req, res) => {
         <div id="screen-main" class="screen active-screen">
             <h1>Головне меню</h1>
             <button onclick="showScreen('screen-games')">🎮 Ігри</button>
+            <button class="secondary-btn" onclick="showScreen('screen-settings')">⚙️ Налаштування</button>
         </div>
 
         <div id="screen-games" class="screen">
             <h1>Вибір гри</h1>
             <button onclick="showScreen('screen-chess-menu')">♟️ Шахмати</button>
+            <button class="secondary-btn" onclick="showScreen('screen-main')">⬅️ Назад</button>
+        </div>
+
+        <div id="screen-settings" class="screen">
+            <h1>Налаштування</h1>
+            <p style="color: #64748b; margin-bottom: 25px;">Тут будуть налаштування.</p>
             <button class="secondary-btn" onclick="showScreen('screen-main')">⬅️ Назад</button>
         </div>
 
@@ -176,9 +181,9 @@ app.get('/', (req, res) => {
 
         <div id="screen-bot-difficulty" class="screen">
             <h1>Виберіть рівень складності</h1>
-            <button onclick="startGameWithBot('easy')">🟢 Легкий</button>
-            <button class="secondary-btn" style="background-color: #f59e0b; color: white;" onclick="startGameWithBot('medium')">🟡 Середній</button>
-            <button class="difficulty-btn" style="background-color: #ef4444;" onclick="startGameWithBot('hard')">🔴 Складний</button>
+            <button onclick="startGame('bot', 'easy')">🟢 Легкий</button>
+            <button class="secondary-btn" style="background-color: #f59e0b; color: white;" onclick="startGame('bot', 'medium')">🟡 Середній</button>
+            <button class="difficulty-btn" style="background-color: #ef4444;" onclick="startGame('bot', 'hard')">🔴 Складний</button>
             <button class="secondary-btn" onclick="showScreen('screen-chess-menu')">⬅️ Назад</button>
         </div>
 
@@ -201,13 +206,13 @@ app.get('/', (req, res) => {
             var board = null;
             var game = null;
 
-            // Перевіряємо URL на наявність room
+            // Перевіряємо URL
             const urlParams = new URLSearchParams(window.location.search);
             const roomParam = urlParams.get('room');
 
+            // Якщо є параметр кімнати, то це друг, який приєднався
             if (roomParam) {
-                // Якщо параметр присутній, одразу починаємо гру
-                startGameWithBot('medium'); 
+                startGame('friend', 'medium');
             }
 
             function showScreen(screenId) {
@@ -219,7 +224,7 @@ app.get('/', (req, res) => {
             function startFriendGame() {
                 showScreen('screen-friend-game');
                 
-                const botUsername = "shahmatii_bot"; // Вкажіть юзернейм вашого бота (без @)
+                const botUsername = "shahmatii_bot"; // Вкажіть ваш юзернейм
                 const roomId = Math.random().toString(36).substring(2, 8);
                 const gameLink = "https://t.me/" + botUsername + "?start=room_" + roomId;
                 
@@ -233,13 +238,19 @@ app.get('/', (req, res) => {
                 });
             }
 
-            function startGameWithBot(difficulty) {
+            function startGame(mode, difficulty) {
                 showScreen('screen-gameplay');
                 
-                let modeText = 'Гра проти бота (' + difficulty + ')';
-                if (roomParam) {
-                    modeText = 'Гра з другом (кімната: ' + roomParam + ')';
+                let modeText = '';
+                if (mode === 'bot') {
+                    modeText = 'Гра проти бота (' + difficulty + ')';
+                } else {
+                    modeText = 'Гра з другом';
+                    if (roomParam) {
+                        modeText += ' (кімната: ' + roomParam + ')';
+                    }
                 }
+                
                 document.getElementById('gameplay-title').innerText = modeText;
                 
                 setTimeout(() => {
