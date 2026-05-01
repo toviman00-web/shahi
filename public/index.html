@@ -173,7 +173,10 @@
                 alert('Посилання скопійовано!');
             });
         }
-
+function joinMyRoom() {
+            // Переводимо власника на екран гри
+            startGame('friend', 'medium');
+        }
         function startGame(mode, difficulty) {
             showScreen('screen-gameplay');
             
