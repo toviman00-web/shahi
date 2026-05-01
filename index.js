@@ -28,7 +28,7 @@ app.post(`/bot${TOKEN}`, (req, res) => {
     }
 });
 
-// Обробка запуску бота з параметрами
+// Обробка запуску бота
 bot.onText(/\/start (.+)/, (msg, match) => {
     const chatId = msg.chat.id;
     const payload = match[1];
@@ -47,10 +47,9 @@ bot.onText(/\/start (.+)/, (msg, match) => {
     }
 });
 
-// Обробка звичайної команди /start
 bot.onText(/\/start$/, (msg) => {
     const chatId = msg.chat.id;
-    bot.sendMessage(chatId, "Привіт! Натисни кнопку нижче, щоб відкрити Web App гру в шахи.", {
+    bot.sendMessage(chatId, "Привіт! Натисни кнопку нижче, щоб відкрити гру.", {
         reply_markup: {
             inline_keyboard: [
                 [{ text: "🎮 Грати в шахи", web_app: { url: WEBAPP_URL } }]
@@ -149,18 +148,11 @@ app.get('/', (req, res) => {
         <div id="screen-main" class="screen active-screen">
             <h1>Головне меню</h1>
             <button onclick="showScreen('screen-games')">🎮 Ігри</button>
-            <button class="secondary-btn" onclick="showScreen('screen-settings')">⚙️ Налаштування</button>
         </div>
 
         <div id="screen-games" class="screen">
             <h1>Вибір гри</h1>
             <button onclick="showScreen('screen-chess-menu')">♟️ Шахмати</button>
-            <button class="secondary-btn" onclick="showScreen('screen-main')">⬅️ Назад</button>
-        </div>
-
-        <div id="screen-settings" class="screen">
-            <h1>Налаштування</h1>
-            <p style="color: #64748b; margin-bottom: 25px;">Тут будуть налаштування.</p>
             <button class="secondary-btn" onclick="showScreen('screen-main')">⬅️ Назад</button>
         </div>
 
@@ -205,12 +197,11 @@ app.get('/', (req, res) => {
 
             var board = null;
             var game = null;
+            var selectedSquare = null; // Зберігаємо клітинку, з якої робимо хід
 
-            // Перевіряємо URL
             const urlParams = new URLSearchParams(window.location.search);
             const roomParam = urlParams.get('room');
 
-            // Якщо є параметр кімнати, то це друг, який приєднався
             if (roomParam) {
                 startGame('friend', 'medium');
             }
@@ -224,7 +215,7 @@ app.get('/', (req, res) => {
             function startFriendGame() {
                 showScreen('screen-friend-game');
                 
-                const botUsername = "shahmatii_bot";
+                const botUsername = "shahmatii_bot"; // Переконайтеся, що юзернейм збігається з вашим
                 const roomId = Math.random().toString(36).substring(2, 8);
                 const gameLink = "https://t.me/" + botUsername + "?start=room_" + roomId;
                 
@@ -255,35 +246,57 @@ app.get('/', (req, res) => {
                 
                 setTimeout(() => {
                     game = new Chess();
+                    
                     var config = {
-                        draggable: true,
+                        draggable: false, // Вимикаємо стандартне перетягування (draggable), щоб додати кліки
                         position: 'start',
                         pieceTheme: 'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/{piece}.png',
-                        onDragStart: onDragStart,
-                        onDrop: onDrop,
-                        onSnapEnd: onSnapEnd
                     };
+                    
                     board = Chessboard('myBoard', config);
                     updateStatus();
-                }, 200);
+
+                    // Додаємо обробник натискання на дошку
+                    $('#myBoard').on('click', '.square-55d63', function() {
+                        var square = $(this).attr('data-square');
+                        handleClick(square);
+                    });
+                }, 300);
             }
 
-            function onDragStart(source, piece, position, orientation) {
-                if (game.game_over()) return false;
-            }
+            function handleClick(square) {
+                // Якщо фігуру ще не вибрано
+                if (!selectedSquare) {
+                    var piece = game.get(square);
+                    if (piece) {
+                        selectedSquare = square;
+                        // Візуально виділяємо вибрану клітинку
+                        $('[data-square="' + square + '"]').css('background', '#64ffda');
+                    }
+                } else {
+                    // Якщо клітинка вже виділена, робимо хід
+                    var source = selectedSquare;
+                    var target = square;
 
-            function onDrop(source, target) {
-                var move = game.move({
-                    from: source,
-                    to: target,
-                    promotion: 'q'
-                });
-                if (move === null) return 'snapback';
-                updateStatus();
-            }
+                    // Знімаємо підсвічування з попередньої клітинки
+                    $('[data-square="' + source + '"]').css('background', '');
 
-            function onSnapEnd() {
-                board.position(game.fen());
+                    var move = game.move({
+                        from: source,
+                        to: target,
+                        promotion: 'q' // Автоперетворення на ферзя для простоти
+                    });
+
+                    selectedSquare = null; // Скидаємо вибір
+
+                    if (move === null) {
+                        // Якщо хід неможливий, скасовуємо виділення та не робимо дій
+                        return;
+                    }
+
+                    board.position(game.fen());
+                    updateStatus();
+                }
             }
 
             function updateStatus() {
