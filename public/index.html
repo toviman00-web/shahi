@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Telegram Шахи</title>
-    <link rel="stylesheet" pieceTheme: 'https://raw.githubusercontent.com/oakmac/chessboardjs/master/img/chesspieces/wikipedia/{piece}.png',>
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
     <style>
         * { box-sizing: border-box; }
         body {
@@ -138,9 +138,7 @@
         var selectedSquare = null;
         var socket = io();
         var currentRoomId = null;
-        
-        // Зберігаємо колір гравця (білі або чорні)
-        var playerColor = null; 
+        var playerColor = null; // 'w' або 'b'
 
         const urlParams = new URLSearchParams(window.location.search);
         const roomParam = urlParams.get('room');
@@ -148,9 +146,7 @@
         if (roomParam) {
             currentRoomId = roomParam;
             socket.emit('join_room', currentRoomId);
-            
-            // Якщо є параметр - це гравець, який приєднався, тобто грає за чорних
-            playerColor = 'b';
+            playerColor = 'b'; // Гравець, який приєднується, грає за чорних
             startGame('friend', 'medium');
         }
 
@@ -168,9 +164,7 @@
             currentRoomId = roomId;
             
             socket.emit('join_room', currentRoomId);
-            
-            // Власник створює гру і грає за білих
-            playerColor = 'w';
+            playerColor = 'w'; // Створювач гри грає за білих
             
             const gameLink = "https://t.me/" + botUsername + "?start=room_" + roomId;
             document.getElementById('link-box').innerText = gameLink;
@@ -204,7 +198,7 @@
                 var config = {
                     draggable: false,
                     position: 'start',
-                    pieceTheme: 'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/{piece}.png',
+                    pieceTheme: 'https://raw.githubusercontent.com/oakmac/chessboardjs/master/img/chesspieces/wikipedia/{piece}.png',
                 };
                 
                 board = Chessboard('myBoard', config);
@@ -228,7 +222,6 @@
         }
 
         function handleClick(square) {
-            // Перевіряємо чи зараз черга ходити вашого кольору
             if (playerColor && game.turn() !== playerColor) {
                 alert("Зараз не ваша черга ходити!");
                 return;
@@ -236,7 +229,6 @@
 
             if (!selectedSquare) {
                 var piece = game.get(square);
-                // Перевіряємо, чи гравець намагається взяти свою фігуру
                 if (piece && piece.color === playerColor) {
                     selectedSquare = square;
                     $('[data-square="' + square + '"]').css('background', '#64ffda');
