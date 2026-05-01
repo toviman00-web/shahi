@@ -30,13 +30,26 @@ app.post(`/bot${TOKEN}`, (req, res) => {
 
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
-    bot.sendMessage(chatId, "Привіт! Натисни кнопку нижче, щоб відкрити гру.", {
-        reply_markup: {
-            inline_keyboard: [
-                [{ text: "🎮 Грати в шахи", web_app: { url: WEBAPP_URL } }]
-            ]
-        }
-    });
+    
+    // Перевіряємо, чи є в тексті параметри (якщо друг перейшов за посиланням з Telegram)
+    const text = msg.text;
+    if (text && text.includes('room_')) {
+        bot.sendMessage(chatId, "Привіт! Ви приєдналися до гри з другом! Натисніть кнопку нижче, щоб відкрити шахову дошку.", {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: "🎮 Приєднатися до гри", web_app: { url: WEBAPP_URL } }]
+                ]
+            }
+        });
+    } else {
+        bot.sendMessage(chatId, "Привіт! Натисни кнопку нижче, щоб відкрити гру.", {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: "🎮 Грати в шахи", web_app: { url: WEBAPP_URL } }]
+                ]
+            }
+        });
+    }
 });
 
 app.get('/', (req, res) => {
@@ -145,7 +158,7 @@ app.get('/', (req, res) => {
 
         <div id="screen-friend-game" class="screen">
             <h1>Гра з другом</h1>
-            <p>Надішліть це посилання другу. Як тільки він перейде, почнеться гра:</p>
+            <p>Надішліть посилання другу (воно відкриє бота у Telegram):</p>
             <div id="link-box">Завантаження...</div>
             <button onclick="copyLink()">📋 Скопіювати посилання</button>
             <button class="secondary-btn" onclick="showScreen('screen-chess-menu')">⬅️ Назад</button>
@@ -194,8 +207,11 @@ app.get('/', (req, res) => {
 
             function startFriendGame() {
                 showScreen('screen-friend-game');
+                
+                // Генеруємо посилання, яке веде на вашого бота з параметром
+                const botUsername = "shahmatii_bot"; // Вкажіть юзернейм вашого бота без @
                 const roomId = Math.random().toString(36).substring(2, 8);
-                const gameLink = "https://shahi-production.up.railway.app/room/" + roomId;
+                const gameLink = "https://t.me/" + botUsername + "?start=room_" + roomId;
                 
                 document.getElementById('link-box').innerText = gameLink;
             }
@@ -203,7 +219,7 @@ app.get('/', (req, res) => {
             function copyLink() {
                 const linkText = document.getElementById('link-box').innerText;
                 navigator.clipboard.writeText(linkText).then(() => {
-                    alert('Посилання скопійовано!');
+                    alert('Посилання скопійовано! Надішліть його другу.');
                 });
             }
 
@@ -211,11 +227,8 @@ app.get('/', (req, res) => {
                 showScreen('screen-gameplay');
                 document.getElementById('gameplay-title').innerText = 'Гра проти бота (' + difficulty + ')';
                 
-                // Даємо екрану час промалюватися перед викликом chessboard
                 setTimeout(() => {
                     game = new Chess();
-                    
-                    // Вказуємо правильний шлях до піктограм фігур
                     var config = {
                         draggable: true,
                         position: 'start',
