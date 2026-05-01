@@ -28,28 +28,34 @@ app.post(`/bot${TOKEN}`, (req, res) => {
     }
 });
 
-bot.onText(/\/start/, (msg) => {
+// Обробка команд
+bot.onText(/\/start (.+)/, (msg, match) => {
     const chatId = msg.chat.id;
+    const payload = match[1]; // Отримуємо параметр, наприклад, "room_xxxxxx"
     
-    // Перевіряємо, чи є в тексті параметри (якщо друг перейшов за посиланням з Telegram)
-    const text = msg.text;
-    if (text && text.includes('room_')) {
-        bot.sendMessage(chatId, "Привіт! Ви приєдналися до гри з другом! Натисніть кнопку нижче, щоб відкрити шахову дошку.", {
+    if (payload && payload.startsWith('room_')) {
+        const roomId = payload.split('_')[1];
+        
+        // Повідомлення для друга, який перейшов за посиланням
+        bot.sendMessage(chatId, `Ви успішно перейшли за посиланням для гри в кімнаті: ${roomId}. Натисніть кнопку нижче, щоб почати гру!`, {
             reply_markup: {
                 inline_keyboard: [
                     [{ text: "🎮 Приєднатися до гри", web_app: { url: WEBAPP_URL } }]
                 ]
             }
         });
-    } else {
-        bot.sendMessage(chatId, "Привіт! Натисни кнопку нижче, щоб відкрити гру.", {
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: "🎮 Грати в шахи", web_app: { url: WEBAPP_URL } }]
-                ]
-            }
-        });
     }
+});
+
+bot.onText(/\/start$/, (msg) => {
+    const chatId = msg.chat.id;
+    bot.sendMessage(chatId, "Привіт! Натисни кнопку нижче, щоб відкрити гру в шахи.", {
+        reply_markup: {
+            inline_keyboard: [
+                [{ text: "🎮 Грати в шахи", web_app: { url: WEBAPP_URL } }]
+            ]
+        }
+    });
 });
 
 app.get('/', (req, res) => {
@@ -158,7 +164,7 @@ app.get('/', (req, res) => {
 
         <div id="screen-friend-game" class="screen">
             <h1>Гра з другом</h1>
-            <p>Надішліть посилання другу (воно відкриє бота у Telegram):</p>
+            <p>Скопіюйте посилання та надішліть другу:</p>
             <div id="link-box">Завантаження...</div>
             <button onclick="copyLink()">📋 Скопіювати посилання</button>
             <button class="secondary-btn" onclick="showScreen('screen-chess-menu')">⬅️ Назад</button>
@@ -191,11 +197,11 @@ app.get('/', (req, res) => {
             var board = null;
             var game = null;
 
+            // Перевіряємо URL
             const urlParams = new URLSearchParams(window.location.search);
             const roomParam = urlParams.get('room');
 
             if (roomParam) {
-                alert("Ви успішно приєдналися до гри! Починаємо.");
                 startGameWithBot('medium');
             }
 
@@ -208,8 +214,7 @@ app.get('/', (req, res) => {
             function startFriendGame() {
                 showScreen('screen-friend-game');
                 
-                // Генеруємо посилання, яке веде на вашого бота з параметром
-                const botUsername = "shahmatii_bot"; // Вкажіть юзернейм вашого бота без @
+                const botUsername = "shahmatii_bot"; // Вкажіть юзернейм вашого бота (без @)
                 const roomId = Math.random().toString(36).substring(2, 8);
                 const gameLink = "https://t.me/" + botUsername + "?start=room_" + roomId;
                 
@@ -219,7 +224,7 @@ app.get('/', (req, res) => {
             function copyLink() {
                 const linkText = document.getElementById('link-box').innerText;
                 navigator.clipboard.writeText(linkText).then(() => {
-                    alert('Посилання скопійовано! Надішліть його другу.');
+                    alert('Посилання скопійовано!');
                 });
             }
 
@@ -237,17 +242,16 @@ app.get('/', (req, res) => {
                         onDrop: onDrop,
                         onSnapEnd: onSnapEnd
                     };
-                    
                     board = Chessboard('myBoard', config);
                     updateStatus();
                 }, 200);
             }
 
-            function onDragStart (source, piece, position, orientation) {
+            function onDragStart(source, piece, position, orientation) {
                 if (game.game_over()) return false;
             }
 
-            function onDrop (source, target) {
+            function onDrop(source, target) {
                 var move = game.move({
                     from: source,
                     to: target,
@@ -257,11 +261,11 @@ app.get('/', (req, res) => {
                 updateStatus();
             }
 
-            function onSnapEnd () {
+            function onSnapEnd() {
                 board.position(game.fen());
             }
 
-            function updateStatus () {
+            function updateStatus() {
                 var status = '';
                 var moveColor = 'Білих';
                 if (game.turn() === 'b') {
